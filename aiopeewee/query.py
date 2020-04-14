@@ -8,6 +8,9 @@ from .utils import alist
 
 
 class AioQuery(Query):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._obj = None
 
     async def execute(self):
         raise NotImplementedError
@@ -34,10 +37,18 @@ class AioQuery(Query):
     def __iter__(self):
         raise NotImplementedError()
 
-    # TODO: wath out for PEP492
-    async def __aiter__(self):
-        qr = await self.execute()
-        return await qr.__aiter__()
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        if self._obj is None:
+            self._obj = await self.execute()
+
+        try:
+            return await self._obj.__anext__()
+        except StopAsyncIteration:
+            self._obj = None
+            raise
 
 
 class AioRawQuery(AioQuery, RawQuery):
