@@ -7,10 +7,24 @@ from peewee import RESULTS_TUPLES, RESULTS_DICTS, RESULTS_NAIVE
 from .utils import alist
 
 
+class AioQueryResult:
+
+    def __init__(self, query):
+        self.query = query
+        self._result = None
+
+    async def __anext__(self):
+        if self._result is None:
+            self._result = (await self.query.execute()).__aiter__()
+
+        try:
+            return await self._result.__anext__()
+        except StopAsyncIteration:
+            self._result = None
+            raise
+
+
 class AioQuery(Query):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._obj = None
 
     async def execute(self):
         raise NotImplementedError
@@ -38,17 +52,7 @@ class AioQuery(Query):
         raise NotImplementedError()
 
     def __aiter__(self):
-        return self
-
-    async def __anext__(self):
-        if self._obj is None:
-            self._obj = await self.execute()
-
-        try:
-            return await self._obj.__anext__()
-        except StopAsyncIteration:
-            self._obj = None
-            raise
+        return AioQueryResult(self)
 
 
 class AioRawQuery(AioQuery, RawQuery):
